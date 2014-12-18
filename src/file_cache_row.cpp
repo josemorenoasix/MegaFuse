@@ -1,5 +1,5 @@
-/*  These classes will handle the cached file info.
- *
+/*
+ * These classes will handle the cached file info.
  */
 
 #include "file_cache_row.h"
@@ -10,93 +10,91 @@
 #include <megaclient.h>
 #include <sys/stat.h>
 
-file_cache_row::file_cache_row(): td(-1),status(INVALID),size(0),available_bytes(0),n_clients(0),startOffset(0),modified(false),handle(0)
+file_cache_row::file_cache_row(): td(-1), status(INVALID), size(0), available_bytes(0), n_clients(0), startOffset(0), modified(false), handle(0)
 {
 	char filename[] = "/tmp/mega.XXXXXX";
-	close (mkstemp(filename));
+	close(mkstemp(filename));
 	localname = filename;
-	printf("creato il file %s\n",localname.c_str());
+	printf("Created file: %s\n", localname.c_str());
 }
 file_cache_row::~file_cache_row()
 {
 
 }
-
-
-/* Returns true if a read should not block,
+/* 
+ * Returns true if a read should not block,
  * it doesn't matter if a read will result in an error or in a successful read
  */
-bool file_cache_row::canRead(size_t offset,size_t size)
+bool file_cache_row::canRead(off_t offset,size_t size)
 {
 	return status != file_cache_row::DOWNLOADING || chunksAvailable(offset,size);
-	
-	
 }
-
-int file_cache_row::firstUnavailableOffset()
+off_t file_cache_row::firstUnavailableOffset(bool& ret)
 {
 	if(status != DOWNLOADING && status != DOWNLOAD_PAUSED)
+	{
+		ret = true;
 		return 0;
-	for(unsigned int i = 0; i < availableChunks.size(); i++)
+	}
+	for(size_t i = 0; i < availableChunks.size(); i++)
+	{
 		if(!availableChunks[i])
+		{
+			ret = true;
 			return CacheManager::blockOffset(i);
-	return -1;
-	
+		}
+	}
+	ret = false;
+	return 0;
 }
-
-
-/*tells if the chunks required to perform a read are available*/
-bool file_cache_row::chunksAvailable(int startOffset,int size)
+/*
+ * Tells if the chunks required to perform a read are available
+ */
+bool file_cache_row::chunksAvailable(off_t startOffset, size_t size)
 {
-	int startChunk = CacheManager::numChunks(ChunkedHash::chunkfloor(startOffset));//startOffset/CHUNKSIZE;
-	int endChunk = CacheManager::numChunks(startOffset+size);
+	size_t startChunk = CacheManager::numChunks(ChunkedHash::chunkfloor(startOffset)); // startOffset/CHUNKSIZE
+	size_t endChunk = CacheManager::numChunks(startOffset+size);
 	bool available = true;
-	for(int i = startChunk; i < endChunk && i < (int) availableChunks.size(); i++) {
+	for(size_t i = startChunk; i < endChunk && i < availableChunks.size(); i++) {
 		available = available && availableChunks[i];
 	}
-	//printf("chunksavailable da %d a %d, blocchi da %d a %d escluso. riferimento: %d\n",startOffset,startOffset+size,startChunk,endChunk,ChunkedHash::chunkfloor(startOffset));
 	return available;
 }
-
-/*return the num of chunks required to store a file of this size*/
-int CacheManager::numChunks(size_t pos)
+/*
+ * Returns the num of chunks required to store a file of this size
+ */
+size_t CacheManager::numChunks(size_t pos)
 {
 	size_t end = 0;
 	if(pos == 0)
 		return 0;
-	for(int i=1; i<=8; i++) {
-		end +=i*ChunkedHash::SEGSIZE;
-		if(end >= pos) return i;
+	for(short i=1; i<=8; i++) {
+		end += i*ChunkedHash::SEGSIZE;
+		if(end >= pos)
+			return i;
 	}
 	return 8 + ceil(float(pos-end)/(8.0*ChunkedHash::SEGSIZE));
-	
-	
 }
-
-/*returns the starting offset of a specified block
+/*
+ * Returns the starting offset of a specified block
  */
-
-int CacheManager::blockOffset(int pos)
+size_t CacheManager::blockOffset(size_t pos)
 {
 	m_off_t end = 0;
 	
-	for(int i=1; i<=8; i++) {
-		if(i> pos) return end;
+	for(short i=1; i<=8; i++) {
+		if(i > pos)
+			return end;
 		end +=i*ChunkedHash::SEGSIZE;
 	}
 	return (pos-8)*8*ChunkedHash::SEGSIZE + end;
 }
-
 CacheManager::mapType::iterator CacheManager::findByHandle(uint64_t h)
 {
-	for(auto it = begin(); it != end(); ++it) {
+	for(auto it = begin(); it != end(); ++it)
 		if(it->second.handle == h)
 			return it;
-			
-	}
 	return end();
-	
-	
 }
 CacheManager::mapType::iterator CacheManager::findByTransfer(int td, file_cache_row::CacheStatus status)
 {
@@ -105,20 +103,14 @@ CacheManager::mapType::iterator CacheManager::findByTransfer(int td, file_cache_
 			return it;
 	return end();
 }
-
-
-
 CacheManager::CacheManager()
 {
 
 }
-
 file_cache_row& CacheManager::operator[] (std::string s)
 {
 	return file_cache[s];
-	
 }
-
 CacheManager::mapType::iterator CacheManager::find(std::string s)
 {
 	return file_cache.find(s);

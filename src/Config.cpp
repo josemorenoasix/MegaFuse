@@ -14,17 +14,15 @@ Config* Config::getInstance()
 
 void Config::check_variable(int &var,std::string value,std::string name)
 {
-    var=stoi(value);
-    printf("caricata la variabile %s con il valore %d\n",name.c_str(),var);
+    var = stoi(value);
+    printf("Loaded variable %s with value %d\n", name.c_str(), var);
 
 }
 
-void Config::check_variable(std::string &var,std::string value,std::string name)
+void Config::check_variable(std::string &var, std::string value, std::string name)
 {
     var = value;
-    printf("caricata la variabile %s con il valore %s\n",name.c_str(),value.c_str());
-
-
+    printf("Loaded variable %s with value %s\n", name.c_str(), value.c_str());
 }
 
 bool Config::parseCommandLine(int argc, char**argv)
@@ -150,7 +148,7 @@ void Config::LoadConfig()
             CHECK_VARIABLE(APPKEY);
             CHECK_VARIABLE(MOUNTPOINT);
             else
-                cerr<<"Could not understand the keyword at line"<<linenum<<": "<<strbuf<<endl;
+                cerr<<"Could not understand the keyword at line "<<linenum<<": "<<strbuf<<endl;
         }
         #undef CHECK_VARIABLE
 
@@ -165,7 +163,7 @@ void Config::LoadConfig()
 		MOUNTPOINT = getString("Specify a vailid mountpoint (an empty directory): ",false);
 }
 
-Config::Config():APPKEY("MEGASDK"),fuseindex(-1),configFile("megafuse.conf")
+Config::Config():APPKEY("MEGASDK"), fuseindex(-1), configFile("megafuse.conf")
 {
 
 }

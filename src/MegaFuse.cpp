@@ -17,18 +17,14 @@
 #include "MegaFuse.h"
 MegaFuse::MegaFuse():running(true)
 {
-
 	model = new MegaFuseModel(eh,engine_mutex);
 	MegaApp* handler = model->getCallbacksHandler();
-	
-	
+
 	client = new MegaClient(handler,new CurlHttpIO,new BdbAccess,Config::getInstance()->APPKEY.c_str());
 	event_loop_thread = std::thread(event_loop,this);
 }
 void MegaFuse::event_loop(MegaFuse* that)
 {
-
-
 	for (;that->running;) {
 		that->engine_mutex.lock();
 		client->exec();
@@ -66,7 +62,7 @@ bool MegaFuse::login()
 int MegaFuse::create(const char* path, mode_t mode, fuse_file_info* fi)
 {
 	//std::lock_guard<std::mutex>lock2(engine_mutex);
-	printf("----------------CREATE flags:%X\n",fi->flags);
+	// printf("----------------CREATE flags:%X\n",fi->flags);
 	fi->flags = fi->flags |O_CREAT | O_TRUNC;// | O_WRONLY;
 	
 	return model->open(path,fi);
@@ -78,30 +74,32 @@ int MegaFuse::getAttr(const char* path,struct stat* stbuf)
 	if(model->getAttr(path,stbuf) == 0) //file locally cached
 		return 0;
 
-
 	Node *n = model->nodeByPath(path);
 	if(!n)
 		return -ENOENT;
 	switch (n->type) {
-	case FILENODE:
-		stbuf->st_mode = S_IFREG | 0666;
-		stbuf->st_nlink = 1;
-		stbuf->st_size = n->size;
-		stbuf->st_mtime = n->ctime;
-		break;
-
-	case FOLDERNODE:
-	case ROOTNODE:
-		stbuf->st_mode = S_IFDIR | 0777;
-		stbuf->st_nlink = 1;
-		stbuf->st_size = 4096;
-		stbuf->st_mtime = n->ctime;
-		break;
-	default:
-		printf("invalid node\n");
-		return -EINVAL;
+		case FILENODE:
+			stbuf->st_mode = S_IFREG | 0666;
+			stbuf->st_nlink = 1;
+			stbuf->st_size = n->size;
+			stbuf->st_mtime = n->ctime;
+			stbuf->st_gid = getgid();
+			stbuf->st_uid = getuid();
+			break;
+		case FOLDERNODE:
+		case ROOTNODE:
+		case RUBBISHNODE:
+			stbuf->st_mode = S_IFDIR | 0777;
+			stbuf->st_nlink = 1;
+			stbuf->st_size = 0;
+			stbuf->st_mtime = n->ctime;
+			stbuf->st_gid = getgid();
+			stbuf->st_uid = getuid();
+			break;
+		default:
+			printf("invalid node\n");
+			return -EINVAL;
 	}
-
 
 	return 0;
 }
@@ -115,7 +113,6 @@ int MegaFuse::truncate(const char *a,off_t o)
 int MegaFuse::mkdir(const char* p, mode_t mode)
 {
 	std::unique_lock<std::mutex> l(engine_mutex);
-
 
 	auto path = model->splitPath(p);
 	std::string base = path.first;
@@ -194,9 +191,6 @@ int MegaFuse::readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t
 	for(auto it = names.begin(); it != names.end(); ++it)
 		filler(buf,it->c_str(),NULL,0);
 
-
-
-
 	return 0;
 }
 
@@ -238,9 +232,7 @@ int MegaFuse::rename(const char* src, const char* dst)
 		auto l_res = el.waitEvent();
 	}
 
-
 	return 0;
-
 
 }
 
@@ -270,8 +262,5 @@ int MegaFuse::unlink(const char* s)
 		return 0;
 	}
 
-
-
 	return 0;
-
 }
