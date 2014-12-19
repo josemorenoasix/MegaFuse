@@ -240,7 +240,7 @@ int MegaFuse::write(const char* path, const char* buf, size_t size, off_t offset
 }
 int MegaFuse::unlink(const char* s)
 {
-	printf("-----------unlink %s\n",s);
+	printf("\033[2K-----------unlink %s\n",s);
 	{
 		std::lock_guard<std::mutex>lock(engine_mutex);
 		Node *n = model->nodeByPath(s);

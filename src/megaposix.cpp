@@ -83,108 +83,104 @@ CurlHttpIO::CurlHttpIO()
 	curlm = curl_multi_init();
 
 	curlsh = curl_share_init();
-	curl_share_setopt(curlsh,CURLSHOPT_SHARE,CURL_LOCK_DATA_DNS);
-	curl_share_setopt(curlsh,CURLSHOPT_SHARE,CURL_LOCK_DATA_SSL_SESSION);
+	curl_share_setopt(curlsh, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
+	curl_share_setopt(curlsh, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION);
 
-	contenttypejson = curl_slist_append(NULL,"Content-Type: application/json");
+	contenttypejson = curl_slist_append(NULL, "Content-Type: application/json");
 	contenttypejson = curl_slist_append(contenttypejson, "Expect:");
 
-	contenttypebinary = curl_slist_append(NULL,"Content-Type: application/octet-stream");
+	contenttypebinary = curl_slist_append(NULL, "Content-Type: application/octet-stream");
 	contenttypebinary = curl_slist_append(contenttypebinary, "Expect:");
 }
-
 CurlHttpIO::~CurlHttpIO()
 {
 	curl_global_cleanup();
 }
-
-// update monotonously increasing timestamp in deciseconds
+/*
+ * Update monotonously increasing timestamp in deciseconds
+ */
 void CurlHttpIO::updatedstime()
 {
 	timespec ts;
-
-	clock_gettime(CLOCK_MONOTONIC,&ts);
+	clock_gettime(CLOCK_MONOTONIC, &ts);
 
 	ds = ts.tv_sec*10+ts.tv_nsec/100000000;
 }
-
-// POST request to URL
+/*
+ * POST request to URL
+ */
 void CurlHttpIO::post(HttpReq* req, const char* data, unsigned len)
 {
-	if (debug)
+	if(debug)
 	{
-		cout << "POST target URL: " << req->posturl << endl;
+		printf("\033[2KPOST target URL: %s\n", req->posturl.c_str());
 
-		if (req->binary) cout << "[sending " << req->out->size() << " bytes of raw data]" << endl;
-		else cout << "Sending: " << *req->out << endl;
+		if (req->binary)
+			printf("\033[2K[Sending: %lu bytes of raw data]\n", req->out->size());
+		else
+			printf("\033[2KSending: %s\n", req->out->c_str());
 	}
-
-	CURL* curl;
-
 	req->in.clear();
 
-	if ((curl = curl_easy_init()))
+	CURL* curl = curl_easy_init();
+	if(!curl)
 	{
-		curl_easy_setopt(curl,CURLOPT_URL,req->posturl.c_str());
-		curl_easy_setopt(curl,CURLOPT_POSTFIELDS,data ? data : req->out->data());
-		curl_easy_setopt(curl,CURLOPT_POSTFIELDSIZE,data ? len : req->out->size());
-		curl_easy_setopt(curl,CURLOPT_USERAGENT,"MEGA Client Access Engine/1.0");
-		curl_easy_setopt(curl,CURLOPT_HTTPHEADER,req->type == REQ_JSON ? contenttypejson : contenttypebinary);
-		curl_easy_setopt(curl,CURLOPT_SHARE,curlsh);
-		curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,write_data);
-		curl_easy_setopt(curl,CURLOPT_WRITEDATA,(void*)req);
-		curl_easy_setopt(curl,CURLOPT_PRIVATE,(void*)req);
-
-		curl_multi_add_handle(curlm,curl);
-
-		req->status = REQ_INFLIGHT;
-
-		req->httpiohandle = (void*)curl;
+		req->status = REQ_FAILURE;
+		return;
 	}
-	else req->status = REQ_FAILURE;
-}
+	curl_easy_setopt(curl, CURLOPT_URL, req->posturl.c_str());
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data ? data : req->out->data());
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, data ? len : req->out->size());
+	curl_easy_setopt(curl, CURLOPT_USERAGENT, "MEGA Client Access Engine/1.0");
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, req->type == REQ_JSON ? contenttypejson : contenttypebinary);
+	curl_easy_setopt(curl, CURLOPT_SHARE, curlsh);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)req);
+	curl_easy_setopt(curl, CURLOPT_PRIVATE, (void*)req);
 
-// cancel pending HTTP request
+	curl_multi_add_handle(curlm, curl);
+
+	req->status = REQ_INFLIGHT;
+
+	req->httpiohandle = (void*)curl;
+}
+/*
+ * Cancel pending HTTP request
+ */
 void CurlHttpIO::cancel(HttpReq* req)
 {
-	if (req->httpiohandle)
-	{
-		curl_multi_remove_handle(curlm,(CURL*)req->httpiohandle);
-		curl_easy_cleanup((CURL*)req->httpiohandle);
+	if(!req->httpiohandle)
+		return;
+	curl_multi_remove_handle(curlm,(CURL*)req->httpiohandle);
+	curl_easy_cleanup((CURL*)req->httpiohandle);
 
-		req->httpstatus = 0;
-		req->status = REQ_FAILURE;
-		req->httpiohandle = NULL;
-	}
+	req->httpstatus = 0;
+	req->status = REQ_FAILURE;
+	req->httpiohandle = NULL;
 }
 
 // real-time progress information on POST data
 m_off_t CurlHttpIO::postpos(void* handle)
 {
 	double bytes;
-
-	curl_easy_getinfo(handle,CURLINFO_SIZE_UPLOAD,&bytes);
-
-	return (m_off_t)bytes;
+	curl_easy_getinfo(handle, CURLINFO_SIZE_UPLOAD, &bytes);
+	return (m_off_t) bytes;
 }
 
 // process events
 int CurlHttpIO::doio()
 {
-	int done;
-
-	done = 0;
-
+	int done = 0;
 	CURLMsg *msg;
+
 	int dummy;
+	curl_multi_perform(curlm, &dummy);
 
-	curl_multi_perform(curlm,&dummy);
-
-	while ((msg = curl_multi_info_read(curlm,&dummy)))
+	while ((msg = curl_multi_info_read(curlm, &dummy)))
 	{
 		HttpReq* req;
 
-		if (curl_easy_getinfo(msg->easy_handle,CURLINFO_PRIVATE,(char**)&req) == CURLE_OK && req)
+		if (curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, (char**)&req) == CURLE_OK && req)
 		{
 			req->httpio = NULL;
 
@@ -192,21 +188,23 @@ int CurlHttpIO::doio()
 			{
 				curl_easy_getinfo(msg->easy_handle,CURLINFO_RESPONSE_CODE,&req->httpstatus);
 
-				if (debug)
+				if(debug)
 				{
-					cout << "CURLMSG_DONE with HTTP status: " << req->httpstatus << endl;
-
-					if (req->binary) cout << "[received " << req->in.size() << " bytes of raw data]" << endl;
-					else cout << "Received: " << req->in.c_str() << endl;
+					printf("CURLMSG_DONE with HTTP status: %d\n", req->httpstatus);
+					if(req->binary)
+						printf("[received %d bytes of raw data]\n", req->in.size());
+					else
+						printf("Received: %s\n", req->in.c_str());
 				}
 
 				req->status = req->httpstatus == 200 ? REQ_SUCCESS : REQ_FAILURE;
 				done = 1;
+			} else {
+				req->status = REQ_FAILURE;
 			}
-			else req->status = REQ_FAILURE;
 		}
 
-		curl_multi_remove_handle(curlm,msg->easy_handle);
+		curl_multi_remove_handle(curlm, msg->easy_handle);
 		curl_easy_cleanup(msg->easy_handle);
 	}
 
@@ -426,11 +424,11 @@ int main(int argc, char **argv)
 	fuseArguments.push_back("-f");
 	fuseArguments.push_back(Config::getInstance()->MOUNTPOINT);
 
-	for(int i = Config::getInstance()->fuseindex;i<argc && i >= 0;++i)
+	for(int i=Config::getInstance()->fuseindex; i<argc && i >= 0; ++i)
 		fuseArguments.push_back(argv[i]);
 
 	char * fuseArgv[fuseArguments.size()];
-	for(int i = 0;i < fuseArguments.size();i++)
+	for(size_t i = 0; i < fuseArguments.size(); ++i)
 		fuseArgv[i] = strdup(fuseArguments[i].c_str());
 
 	megafuse_mainpp(fuseArguments.size(), fuseArgv, &mf);

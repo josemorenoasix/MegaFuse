@@ -208,7 +208,7 @@ int MegaFuseModel::open(const char *p, struct fuse_file_info *fi)
 	Node *n = nodeByPath(p);
 	auto it = cacheManager.find(path);
 	if(it != cacheManager.end()  && it->second.status == file_cache_row::DOWNLOAD_PAUSED) {
-		printf("Resuming paused download\n");
+		printf("\033[2KResuming paused download\n");
 	}
 	// Files with 0 clients are OK, it's a cache
 	bool oldCache = it != cacheManager.end() && n && it->second.last_modified < n->mtime;

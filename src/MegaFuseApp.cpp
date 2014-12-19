@@ -152,11 +152,17 @@ void MegaFuseApp::transfer_complete(int td, chunkmac_map* macs, const char* fn)
 			}
 		}
 		
-		if(startOffset+neededBytes > it->second.size)
-			neededBytes = 0;
-		printf("\033[2KDownload reissued, missing %d bytes starting from block %d\n", neededBytes, startBlock);
 		Node* n = model->nodeByPath(it->first);
-		int td = client->topen(n->nodehandle, NULL, startOffset, neededBytes, 1);
+		int td;
+		if(startOffset+neededBytes > it->second.size)
+		{
+			printf("\033[2KDownload reissued, missing %lu bytes starting from block %d\n", -1, startBlock);
+			td = client->topen(n->nodehandle, NULL, startOffset, -1, 1);
+			printf("\033[2Ktd %d\n", td);
+		} else {
+			printf("\033[2KDownload reissued, missing %lu bytes starting from block %d\n", neededBytes, startBlock);
+			td = client->topen(n->nodehandle, NULL, startOffset, neededBytes, 1);
+		}
 		if(td < 0)
 			return;
 		it->second.td = td;
@@ -284,25 +290,35 @@ void MegaFuseApp::transfer_update(int td, m_off_t bytes, m_off_t size, dstime st
 			abort();
 		}
 	}
-
 	{
-		std::string rigaDownload = "[";
-		int chunksSize = it->second.availableChunks.size();
-		for(int i=0; i<50; i++)
+		std::string r;
+		size_t n = it->second.availableChunks.size();
+		for(size_t i=0; i<n; ++i)
+			r.append(it->second.availableChunks[i]?"#":"-");
+		std::string t;
+		unsigned char c;
+		while(r.length() > 60)
 		{
-			if(it->second.availableChunks[i*chunksSize/50])
-				rigaDownload.append("#");
-			else
-				rigaDownload.append("-");
+			t = "";
+			n = r.length();
+			for(size_t i=0; i<n; i += 3)
+			{
+				c = 0;
+				for(unsigned short z=0; z<3; ++z)
+					if(i+z >= n || r.at(i+z) == '#')
+						c++;
+				t.append(c>1?"#":"-");
+			}
+			r = t;
 		}
-		rigaDownload.append("] ");
 
-		static time_t last_update = time(NULL);
-		if(last_update < time(NULL))
-		{
-			printf("\033[2K%s %d MB, %0.2f KB/s, avaible_b/size %lu/%lu %lu/%lu\t\t \r", rigaDownload.c_str(), size/1024/1024, (float) bytes*10/(1024*(client->httpio->ds-starttime)+1), it->second.available_bytes, it->second.size, it->second.startOffset+bytes);
-			last_update = time(NULL);
-		}
+		//static time_t last_update = time(NULL);
+		//if(last_update < time(NULL))
+		//{
+			printf("\033[2K[%s] %0.2f/%0.2f MB, %d KB/s\r", r.c_str(), float(1.0*(it->second.startOffset+bytes)/1024/1024), float(1.0*size/1024/1024), 10*bytes/(1024*(client->httpio->ds-starttime)+1));
+			fflush(stdout);
+		//	last_update = time(NULL);
+		//}
 	}
 
 	model->eh.notifyEvent(EventsHandler::TRANSFER_UPDATE,0);
