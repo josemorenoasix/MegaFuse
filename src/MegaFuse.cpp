@@ -17,48 +17,45 @@
 #include "MegaFuse.h"
 MegaFuse::MegaFuse():running(true)
 {
-	model = new MegaFuseModel(eh,engine_mutex);
+	model = new MegaFuseModel(eh, engine_mutex);
 	MegaApp* handler = model->getCallbacksHandler();
 
-	client = new MegaClient(handler,new CurlHttpIO,new BdbAccess,Config::getInstance()->APPKEY.c_str());
-	event_loop_thread = std::thread(event_loop,this);
+	client = new MegaClient(handler, new CurlHttpIO, new BdbAccess, Config::getInstance()->APPKEY.c_str());
+	event_loop_thread = std::thread(event_loop, this);
 }
 void MegaFuse::event_loop(MegaFuse* that)
 {
-	for (;that->running;) {
+	while(that->running) {
 		that->engine_mutex.lock();
 		client->exec();
 		that->engine_mutex.unlock();
 		client->wait();
 	}
 }
-
 MegaFuse::~MegaFuse()
 {
 	running=false;
 	event_loop_thread.join();
 	delete model;
 }
-
 bool MegaFuse::login()
 {
 	std::string username = Config::getInstance()->USERNAME.c_str();
 	std::string password = Config::getInstance()->PASSWORD.c_str();
 	model->engine_mutex.lock();
-	client->pw_key(password.c_str(),pwkey);
-	client->login(username.c_str(),pwkey,1);
+	client->pw_key(password.c_str(), pwkey);
+	client->login(username.c_str(), pwkey, 1);
 	model->engine_mutex.unlock();
 	{
 		EventsListener el(eh,EventsHandler::LOGIN_RESULT);
 		EventsListener eu(eh,EventsHandler::USERS_UPDATED);
 		auto l_res = el.waitEvent();
-		if (l_res.result <0)
+		if (l_res.result < 0)
 			return false;
 		eu.waitEvent();
 	}
 	return true;
 }
-
 int MegaFuse::create(const char* path, mode_t mode, fuse_file_info* fi)
 {
 	//std::lock_guard<std::mutex>lock2(engine_mutex);
@@ -71,12 +68,20 @@ int MegaFuse::create(const char* path, mode_t mode, fuse_file_info* fi)
 int MegaFuse::getAttr(const char* path,struct stat* stbuf)
 {
 	std::lock_guard<std::mutex>lock2(engine_mutex);
-	if(model->getAttr(path,stbuf) == 0) //file locally cached
+	printf("\033[2KgetAttr: %s ", path);
+	if(model->getAttr(path, stbuf) == 0) // file locally cached
+	{
+		printf("\x1b[32m[cache]\x1b[0m\n");
 		return 0;
-
-	Node *n = model->nodeByPath(path);
+	}
+	printf("\x1b[31m[cache]\x1b[0m");
+	Node *n = model->nodeByPath(path);	
 	if(!n)
+	{
+		printf("\x1b[31m[MEGA]\x1b[0m\n");
 		return -ENOENT;
+	}
+	printf("\x1b[32m[MEGA]\x1b[0m\n");
 	switch (n->type) {
 		case FILENODE:
 			stbuf->st_mode = S_IFREG | 0666;
@@ -155,12 +160,10 @@ int MegaFuse::mkdir(const char* p, mode_t mode)
 		return -EIO;
 	return 0;
 }
-
 int MegaFuse::open(const char* path, fuse_file_info* fi)
 {
 	return model->open(path,fi);
 }
-
 int MegaFuse::read(const char* path, char* buf, size_t size, off_t offset, fuse_file_info* fi)
 {
 	//FIXME: the engine is running between the two calls
@@ -169,7 +172,6 @@ int MegaFuse::read(const char* path, char* buf, size_t size, off_t offset, fuse_
 		return res;
 	return model->read(path,buf,size,offset,fi);
 }
-
 int MegaFuse::readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset, fuse_file_info* fi)
 {
 	std::lock_guard<std::mutex>lockE(engine_mutex);
@@ -193,13 +195,10 @@ int MegaFuse::readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t
 
 	return 0;
 }
-
-
 int MegaFuse::release(const char* path, fuse_file_info* fi)
 {
 	return model->release(path,fi);
 }
-
 int MegaFuse::rename(const char* src, const char* dst)
 {
 	std::unique_lock<std::mutex>lockE(engine_mutex);
@@ -233,9 +232,7 @@ int MegaFuse::rename(const char* src, const char* dst)
 	}
 
 	return 0;
-
 }
-
 int MegaFuse::write(const char* path, const char* buf, size_t size, off_t offset, fuse_file_info* fi)
 {
 	std::lock_guard<std::mutex>lock2(engine_mutex);

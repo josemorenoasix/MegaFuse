@@ -9,11 +9,10 @@
 
 #include "file_cache_row.h"
 #include <unordered_map>
-
 #include "EventsHandler.h"
+
 const char* errorstring(error e);
 class MegaFuseModel;
-
 class MegaFuseApp : public DemoApp
 {
 	private:
@@ -36,7 +35,6 @@ class MegaFuseApp : public DemoApp
 		void nodes_updated(Node**, int);
 		void users_updated(User** u, int count);
 };
-
 class MegaFuseModel
 {
 	friend class MegaFuseApp;

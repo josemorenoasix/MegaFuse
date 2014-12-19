@@ -13,7 +13,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-
 std::set<std::string> MegaFuseModel::readdir(const char *path)
 {
 	std::set<std::string> names;
@@ -28,10 +27,9 @@ std::set<std::string> MegaFuseModel::readdir(const char *path)
 	
 	return names;
 }
-
 int MegaFuseModel::rename(const char * src, const char *dst)
 {
-	printf("--------requested rename from %s to %s\n",src,dst);
+	printf("\033[2KRenaming %s to %s\n", src, dst);
 	
 	if(cacheManager.find(src) == cacheManager.end() )
 		return -ENOENT;
@@ -43,7 +41,6 @@ int MegaFuseModel::rename(const char * src, const char *dst)
 		cacheManager.tryErase(cacheManager.find(src));
 	return 0;
 }
-
 MegaFuseModel::MegaFuseModel(EventsHandler &eh,std::mutex &em):engine_mutex(em), eh(eh), callbacksHandler(this)
 {
 
@@ -54,7 +51,6 @@ int MegaFuseModel::getAttr(const char *path, struct stat *stbuf)
 	{
 		if(it->first == std::string(path))
 		{
-			printf("Retrieved from the cache: %s\n", path);
 			stbuf->st_mode = S_IFREG | 0666;
 			stbuf->st_nlink = 1;
 			
@@ -66,12 +62,9 @@ int MegaFuseModel::getAttr(const char *path, struct stat *stbuf)
 			return 0;
 		}
 	}
-	printf("%s not found in cache\n", path);
 	
 	return -ENOENT;
-	
 }
-
 std::pair<std::string,std::string> MegaFuseModel::splitPath(std::string path)
 {
 	int pos = path.find_last_of('/');
@@ -79,16 +72,14 @@ std::pair<std::string,std::string> MegaFuseModel::splitPath(std::string path)
 	std::string filename = path.substr(pos+1);
 	if(basename == "")
 		basename = "/";
+
 	return std::pair<std::string,std::string> (basename, filename);
 }
-
-//warning, no mutex
+// Warning, no mutex
 Node* MegaFuseModel::nodeByPath(std::string path)
 {
-	std::string oldpath = path;
-	printf("Searching node by path: %s\n", path.c_str());
 	if(engine_mutex.try_lock()) {
-		printf("Mutex Error in MegaFuseModel::nodeByPath\n");
+		printf("\033[2KMutex Error in MegaFuseModel::nodeByPath\n");
 		abort();
 	}
 	if (path == "/") {
@@ -96,76 +87,63 @@ Node* MegaFuseModel::nodeByPath(std::string path)
 		n->type = ROOTNODE;
 		return n;
 	}
-	/*if(path == "/.Trash" || path == "/.Trash-1000") {
-		Node*n = client->nodebyhandle(client->rootnodes[2]);
-		n->type = RUBBISHNODE;
-		return n;
-	}*/
-	if(path[0] == '/')
+	if(path.at(0) == '/')
 		path = path.substr(1);
-	/*if(path.substr(0, 7) == "/.Trash")
-	{
-		path = path.substr(path.find('/', 7));
-		Node *n = client->nodebyhandle(client->rootnodes[2]);
-	} else*/
-		Node *n = client->nodebyhandle(client->rootnodes[0]);
+	Node *n = client->nodebyhandle(client->rootnodes[0]);
 	
 	int pos;
-	while ((pos = path.find_first_of('/')) > 0) {
+	while((pos = path.find_first_of('/')) > 0) {
 		n = childNodeByName(n, path.substr(0, pos));
 		if(!n)
+		{
 			return NULL;
+		}
+
 		path = path.substr(pos+1);
 	}
-	n = childNodeByName(n,path);
+	n = childNodeByName(n, path);
 	if(!n)
+	{
 		return NULL;
+	}
 
-	printf("Node found in MEGA: %s\n", oldpath.c_str());
 	return n;
 }
-
 Node* MegaFuseModel::childNodeByName(Node *p, std::string name)
 {
 	if(engine_mutex.try_lock()) {
-		printf("Mutex Error in MegaFuseModel::childNodeByName\n");
+		printf("\033[2KMutex Error in MegaFuseModel::childNodeByName\n");
 		abort();
 	}
 	for (node_list::iterator it = p->children.begin(); it != p->children.end(); it++) {
-		if (!strcmp(name.c_str(),(*it)->displayname())) {
+		if (!strcmp(name.c_str(), (*it)->displayname())) {
 			return *it;
 		}
 	}
 
-	printf("File %s not found in MEGA\n", name.c_str());
 	return NULL;
 }
-
-
 void MegaFuseModel::check_cache()
 {
 	if(cacheManager.size() < 2)
 		return;
 
-	printf("Checking cache...\n");
+	printf("\033[2KChecking cache...\n");
 	std::lock_guard<std::mutex>lock(engine_mutex);
 	for(auto it = cacheManager.begin(); it!= cacheManager.end(); ++it) {
 		if(it->second.n_clients==0 && it->second.status ==file_cache_row::AVAILABLE) {
-			printf("Removing file %s from cache\n",it->first.c_str());
+			printf("\033[2KRemoving file %s from cache.\n",it->first.c_str());
 			if(it->second.status ==file_cache_row::DOWNLOADING) //UPLOADING FILES IGNORED
 				client->tclose(it->second.td);
 			cacheManager.tryErase(it);
 		}
 	}
 }
-
 void createthumbnail(const char* filename, unsigned size, string* result);
-
 MegaApp* MegaFuseModel::getCallbacksHandler()
 {
 	return &callbacksHandler;
 }
-
 int MegaFuseModel::release(const char *path, struct fuse_file_info *fi)
 {
 	int ret = 0;
@@ -190,7 +168,7 @@ int MegaFuseModel::release(const char *path, struct fuse_file_info *fi)
 		createthumbnail(it->second.localname.c_str(), 120, &thumbnail);
 		
 		if (thumbnail.size()) {
-			printf("Image detected and thumbnail extracted, size %s bytes\n", thumbnail.size());
+			printf("\033[2KImage detected and thumbnail extracted, size %s bytes\n", thumbnail.size());
 			handle uh = client->uploadhandle(td);
 			client->putfa(&client->ft[td].key, uh, THUMBNAIL120X120, (const byte*)thumbnail.data(), thumbnail.size());
 		}
@@ -202,7 +180,7 @@ int MegaFuseModel::release(const char *path, struct fuse_file_info *fi)
 			auto l_ress = el.waitEvent();
 			if(l_ress.result < 0)
 			{
-				printf("error while uploading the file: %s\n", errorstring(error(l_ress.result)))	;
+				printf("\033[2KError while uploading the file: %s\n", errorstring(error(l_ress.result)));
 				return -EIO;
 			}
 
@@ -216,15 +194,13 @@ int MegaFuseModel::release(const char *path, struct fuse_file_info *fi)
 	}
 	return ret;
 }
-
 int MegaFuseModel::open(const char *p, struct fuse_file_info *fi)
 {
 	auto sPath = splitPath(p);
-	
-	printf("flags: %X\n", fi->flags);
 	std::string path(p);
+	// printf("flags: %X\n", fi->flags);
 	
-	//Workaround for kde bug in debian 7
+	// Workaround for kde bug in debian 7
 	if(sPath.second.find(".directory") == 0 && (fi->flags & O_EXCL))
 		return -EPERM;
 		
@@ -234,7 +210,7 @@ int MegaFuseModel::open(const char *p, struct fuse_file_info *fi)
 	if(it != cacheManager.end()  && it->second.status == file_cache_row::DOWNLOAD_PAUSED) {
 		printf("Resuming paused download\n");
 	}
-	/*files with 0 clients are OK, it's a cache*/
+	// Files with 0 clients are OK, it's a cache
 	bool oldCache = it != cacheManager.end() && n && it->second.last_modified < n->mtime;
 	
 	if(oldCache && it->second.n_clients > 0)
@@ -269,7 +245,7 @@ int MegaFuseModel::open(const char *p, struct fuse_file_info *fi)
 		return 0;
 	}
 	if(it != cacheManager.end() && it->second.status == file_cache_row::DOWNLOAD_PAUSED) {
-		printf("Resuming paused download\n");
+		printf("\033[2KResuming paused download\n");
 	} else {
 		cacheManager[p].status = file_cache_row::INVALID;
 		it = cacheManager.find(p);
@@ -287,13 +263,12 @@ int MegaFuseModel::open(const char *p, struct fuse_file_info *fi)
 	it->second.handle = n->nodehandle;
 	return 0;
 }
-
 int MegaFuseModel::write(const char * path, const char *buf, size_t size, off_t offset, struct fuse_file_info * fi)
 {
 	auto it = cacheManager.find(path);
 	
 	chmod(it->second.localname.c_str(),S_IWUSR|S_IRUSR);
-	printf("write, file %s, apro cache: %s\n", it->first.c_str(),it->second.localname.c_str());
+	printf("\033[2KWrite, file %s, open cache: %s\n", it->first.c_str(), it->second.localname.c_str());
 	int fd = ::open(it->second.localname.c_str(),O_WRONLY);
 	if (fd < 0)
 		return fd;
@@ -307,21 +282,19 @@ int MegaFuseModel::write(const char * path, const char *buf, size_t size, off_t 
 	}
 	return s;
 }
-
-//0 is success
-int MegaFuseModel::makeAvailableForRead(const char *path, off_t offset, size_t size)
+int MegaFuseModel::makeAvailableForRead(const char *path, off_t offset, size_t size) // 0 is success
 {
 	std::unique_lock<std::mutex> engine(engine_mutex);
 	
-	/* casi:
-	 * AVAILABLE o uploading = return true
-	 * INVALID:  stop =false, start = true
-	 * DOWNLOAD_PAUSED stop = false, start = true
-	 * DOWNLOADING vicino: stop = false, start = false
-	 * DOWNLOADING lontano: stop = true, start = true
+	/* 
+	 * Cases:
+	 * AVAILABLE or uploading = return true
+	 * INVALID: 			stop = false, 	start = true
+	 * DOWNLOAD_PAUSED: 	stop = false, 	start = true
+	 * DOWNLOADING near: stop = false, 	start = false
+	 * DOWNLOADING far: 	stop = true, 	start = true
 	 *
-	 * 3 sezioni, stop, start e wait
-	 *
+	 * 3 sections, stop, start and wait
 	 * */
 	auto it = cacheManager.find(path);
 	if(it == cacheManager.end())
@@ -374,7 +347,7 @@ int MegaFuseModel::makeAvailableForRead(const char *path, off_t offset, size_t s
 
 		if(td < 0)
 		{
-			printf("Error while opening the file: %s\n", errorstring(error(td)))	;
+			printf("\033[2KError while opening the file: %s\n", errorstring(error(td)))	;
 			return -EIO;
 		}	
 
@@ -385,7 +358,7 @@ int MegaFuseModel::makeAvailableForRead(const char *path, off_t offset, size_t s
 		auto open_result = el.waitEvent();
 		if(open_result.result < 0)
 		{
-			printf("Error while waiting for topen_result the file: %s\n", errorstring(error(open_result.result)))	;
+			printf("\033[2KError while waiting for topen_result the file: %s\n", errorstring(error(open_result.result)))	;
 			if(open_result.result == API_ETEMPUNAVAIL)
 				return -EAGAIN;
 			return -EIO;
@@ -407,29 +380,24 @@ int MegaFuseModel::makeAvailableForRead(const char *path, off_t offset, size_t s
 
 	return 0;
 }
-
-
-
 int MegaFuseModel::read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
 	std::unique_lock<std::mutex> engine(engine_mutex);
 	
 	int fd = ::open(cacheManager[path].localname.c_str(),O_RDONLY);
 	if (fd < 0 ) {
-		printf("Failed to open the file in read: %s\n", cacheManager[path].localname.c_str());
+		printf("\033[2KFailed to open the file in read: %s\n", cacheManager[path].localname.c_str());
 		return -EIO;
 	}
 	int s = pread(fd,buf,size,offset);
 	close(fd);
 	return s;
 }
-
 int MegaFuseModel::unlink(std::string filename)
 {
-	printf("-------------unlinking %s\n",filename.c_str());
+	printf("\033[2KDeleting file: %s\n", filename.c_str());
 	
 	auto it = cacheManager.find(filename);
-	
 	if(it == cacheManager.end())
 		return -ENOENT;
 		
@@ -441,7 +409,6 @@ int MegaFuseModel::unlink(std::string filename)
 		cacheManager.tryErase(it);
 	return 0;
 }
-
 MegaFuseModel::~MegaFuseModel()
 {
 	auto it = cacheManager.begin();

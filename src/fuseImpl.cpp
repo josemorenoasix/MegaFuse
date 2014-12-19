@@ -52,7 +52,6 @@ int hello_mkdir(const char * path, mode_t mode)
 {
 	std::lock_guard<std::mutex>lock(api_mutex);
 	return megaFuse->mkdir(path, mode);
-
 }
 int hello_create(const char *path, mode_t mode, struct fuse_file_info * fi)
 {
@@ -95,7 +94,7 @@ int hello_statvfs(const char *path, struct statvfs *stat)
 	stat->f_namemax 	= 256;
 	return 0;
 } 
-int megafuse_mainpp(int argc,char**argv,MegaFuse* mf)
+int megafuse_mainpp(int argc, char**argv, MegaFuse* mf)
 {
 	megaFuse = mf;
 	struct fuse_operations hello_oper = {0};

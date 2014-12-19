@@ -394,62 +394,45 @@ void term_echo(int echo)
 {
 	if (echo)
 	{
-		// enable echo
-		tcsetattr(0,TCSANOW,&term);
-	}
-	else
-	{
-		// disable echo
+		tcsetattr(0, TCSANOW, &term);
+	} else {
 		struct termios new_settings = term;
 		new_settings.c_lflag &= ~ECHO;
-		tcsetattr(0,TCSANOW,&new_settings);
+		tcsetattr(0, TCSANOW, &new_settings);
 	}
 }
-int megafuse_mainpp(int argc,char **argv,MegaFuse* mf);
-
-
-
+int megafuse_mainpp(int argc, char **argv, MegaFuse* mf);
 
 #include "Config.h"
 #include "Logger.h"
 int main(int argc, char **argv)
 {
+	if(Config::getInstance()->parseCommandLine(argc, argv))
+		exit(0);
 
-	bool stop = Config::getInstance()->parseCommandLine(argc, argv);
-	if(stop)
-        exit(0);
 	Config::getInstance()->LoadConfig();
 
-	std::string dbpath = string(getenv("HOME")) + "/.megaclient/";
-	mkdir(dbpath.c_str(),0700);
-	chdir(dbpath.c_str());
-	
 	MegaFuse mf;
-
 	if(!mf.login())
-    {
-        printf("login failed. exiting...\n");
-        exit(1);
-    }
+	{
+		fprintf(stderr, "Login failed. Exiting...\n");
+		exit(1);
+	}
    
-	Logger::getInstance().log(Logger::NOTIFY,"MegaFuse is ready");
+	Logger::getInstance().log(Logger::NOTIFY, "MegaFuse is ready");
+
 	std::vector<std::string> fuseArguments;
 	fuseArguments.push_back("megafuse");
 	fuseArguments.push_back("-f");
-
-		fuseArguments.push_back(Config::getInstance()->MOUNTPOINT);
+	fuseArguments.push_back(Config::getInstance()->MOUNTPOINT);
 
 	for(int i = Config::getInstance()->fuseindex;i<argc && i >= 0;++i)
-			fuseArguments.push_back(argv[i]);
-	
+		fuseArguments.push_back(argv[i]);
+
 	char * fuseArgv[fuseArguments.size()];
 	for(int i = 0;i < fuseArguments.size();i++)
 		fuseArgv[i] = strdup(fuseArguments[i].c_str());
 
-
-	
-	
-	megafuse_mainpp(fuseArguments.size(),fuseArgv,&mf);
+	megafuse_mainpp(fuseArguments.size(), fuseArgv, &mf);
 	return 0;
-
 }

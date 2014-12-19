@@ -111,7 +111,7 @@ void MegaFuseApp::topen_result(int td, string* filename, const char* fa, int pfa
 		}
 	}
 	client->dlopen(td, tmp.c_str());
-	printf("Downloading file: %s\n", remotename.c_str());
+	printf("\033[2KDownloading file: %s\n", remotename.c_str());
 	model->cacheManager[remotename].status = file_cache_row::DOWNLOADING;
 	model->cacheManager[remotename].available_bytes = 0;
 	model->cacheManager[remotename].td = td;
@@ -120,23 +120,26 @@ void MegaFuseApp::topen_result(int td, string* filename, const char* fa, int pfa
 //download completed
 void MegaFuseApp::transfer_complete(int td, chunkmac_map* macs, const char* fn)
 {
-	printf("\nDownload complete\n");
-	auto it = model->cacheManager.findByTransfer(td, file_cache_row::DOWNLOADING );
+	auto it = model->cacheManager.findByTransfer(td, file_cache_row::DOWNLOADING);
 	if(it == model->cacheManager.end())
+	{
+		printf("\033[2KDownload complete\n");
 		return;
+	}
 	
 	client->tclose(it->second.td);
 	it->second.td = -1;
 
 	bool ret;
 	off_t missingOffset = it->second.firstUnavailableOffset(ret);
-	if(!ret) {
+	if(!ret)
+	{
 		std::string remotename = it->first;
 
 		it->second.status = file_cache_row::AVAILABLE;
-		model->eh.notifyEvent(EventsHandler::TRANSFER_COMPLETE,+1);
+		model->eh.notifyEvent(EventsHandler::TRANSFER_COMPLETE, +1);
 
-		printf("\rDownload complete: %s, transfer: %d\n", remotename.c_str(), td);
+		printf("\033[2KDownload complete: %s, transfer: %d\n", remotename.c_str(), td);
 	} else {
 		off_t startOffset = missingOffset;
 		size_t startBlock = CacheManager::numChunks(startOffset);
@@ -151,8 +154,8 @@ void MegaFuseApp::transfer_complete(int td, chunkmac_map* macs, const char* fn)
 		
 		if(startOffset+neededBytes > it->second.size)
 			neededBytes = 0;
-		printf("\rDownload reissued, missing %d bytes starting from block %d\n", neededBytes, startBlock);
-		Node*n = model->nodeByPath(it->first);
+		printf("\033[2KDownload reissued, missing %d bytes starting from block %d\n", neededBytes, startBlock);
+		Node* n = model->nodeByPath(it->first);
 		int td = client->topen(n->nodehandle, NULL, startOffset, neededBytes, 1);
 		if(td < 0)
 			return;
@@ -170,13 +173,12 @@ void MegaFuseApp::transfer_complete(int td, handle ulhandle, const byte* ultoken
 		return;
 	}
 
-	printf("Upload Complete\n");
+	printf("\033[2KUpload Complete\n");
 
 	auto sPath = model->splitPath(it->first);
-
 	Node *target = model->nodeByPath(sPath.first);
 	if(!target) {
-		printf("Upload target folder inaccessible, using /\n");
+		printf("\033[2KUpload target folder inaccessible, using /\n");
 		target = client->nodebyhandle(client->rootnodes[0]);
 	}
 	/*if (!putf->targetuser.size() && !client->nodebyhandle(putf->target)) {
@@ -216,7 +218,7 @@ void MegaFuseApp::transfer_complete(int td, handle ulhandle, const byte* ultoken
 		client->putnodes(putf->targetuser.c_str(),newnode,1);
 	} else*/ client->putnodes(target->nodehandle,newnode,1);
 
-	printf("ulhandle %lx, nodehandle %lx\n", ulhandle, newnode->nodehandle);
+	printf("\033[2Kulhandle %lx, nodehandle %lx\n", ulhandle, newnode->nodehandle);
 
 	it->second.td = -1;
 	it->second.modified = false;
@@ -227,7 +229,7 @@ void MegaFuseApp::transfer_complete(int td, handle ulhandle, const byte* ultoken
 }
 void MegaFuseApp::transfer_failed(int td, error e)
 {
-	printf("Upload failure: %d\n", e);
+	printf("\033[2KUpload failure: %d\n", e);
 	client->tclose(td);
 	auto it = model->cacheManager.findByTransfer(td, file_cache_row::UPLOADING);
 	if(it == model->cacheManager.end()) {
@@ -238,19 +240,18 @@ void MegaFuseApp::transfer_failed(int td, error e)
 }
 void MegaFuseApp::transfer_failed(int td, string& filename, error e)
 {
-	printf("Upload failure: %d\n", e);
+	printf("\033[2KUpload failure: %d\n", e);
 	auto it = model->cacheManager.findByTransfer(td,file_cache_row::DOWNLOADING );
 	client->tclose(td);
 
 	it->second.status = file_cache_row::INVALID;
 	model->eh.notifyEvent(EventsHandler::TRANSFER_COMPLETE,-1);
 }
-
 void MegaFuseApp::transfer_update(int td, m_off_t bytes, m_off_t size, dstime starttime)
 {
 	std::string remotename = "";
 	if(model->cacheManager.findByTransfer(td,file_cache_row::UPLOADING ) != model->cacheManager.end()) {
-		printf("\rUPLOAD TD %d: Update: %d KB of %d KB, %0.2f KB/s", td, bytes/1024, size/1024, bytes*10/(1024*(client->httpio->ds-starttime)+1));
+		printf("\033[2KUPLOAD TD %d: Update: %d KB of %d KB, %0.2f KB/s\r", td, bytes/1024, size/1024, bytes*10/(1024*(client->httpio->ds-starttime)+1));
 		fflush(stdout);
 		return;
 	}
@@ -276,21 +277,14 @@ void MegaFuseApp::transfer_update(int td, m_off_t bytes, m_off_t size, dstime st
 		try {
 			if(!it->second.availableChunks[i]) {
 				it->second.availableChunks[i] = true;
-				
-				//printf("block %d/%d available\n",i,(int)it->second.availableChunks.size());
 			}
-
 		} catch(...) {
-			printf("Error while reading block %d\n", i);
+			printf("\033[2KError while reading block %d\n", i);
 			fflush(stdout);
 			abort();
 		}
 	}
 
-
-	/*	cout << remotename << td << ": Update: " << bytes/1024 << " KB of " << size/1024 << " KB, " << bytes*10/(1024*(client->httpio->ds-starttime)+1) << " KB/s" << endl;
-		cout << "scaricato fino al byte " <<(it->second.startOffset+bytes) << " di: "<<size<<endl;
-    */
 	{
 		std::string rigaDownload = "[";
 		int chunksSize = it->second.availableChunks.size();
@@ -302,38 +296,37 @@ void MegaFuseApp::transfer_update(int td, m_off_t bytes, m_off_t size, dstime st
 				rigaDownload.append("-");
 		}
 		rigaDownload.append("] ");
-	
-		//std::cout << "readable bytes: " <<  ChunkedHash::chunkfloor(ChunkedHash::chunkfloor(it->second.startOffset) + bytes) <<std::endl;
-		static time_t last_update= time(NULL);
+
+		static time_t last_update = time(NULL);
 		if(last_update < time(NULL))
 		{
-			printf("%s %d MB, %0.2f KB/s, avaible_b/size %lu/%lu %lu/%lu\t\t \r", rigaDownload.c_str(), size/1024/1024, (float) bytes*10/(1024*(client->httpio->ds-starttime)+1), it->second.available_bytes, it->second.size, it->second.startOffset+bytes);
+			printf("\033[2K%s %d MB, %0.2f KB/s, avaible_b/size %lu/%lu %lu/%lu\t\t \r", rigaDownload.c_str(), size/1024/1024, (float) bytes*10/(1024*(client->httpio->ds-starttime)+1), it->second.available_bytes, it->second.size, it->second.startOffset+bytes);
 			last_update = time(NULL);
 		}
 	}
 
 	model->eh.notifyEvent(EventsHandler::TRANSFER_UPDATE,0);
-	if( it->second.n_clients<=0) {
+	if(it->second.n_clients <= 0)
+	{
 		client->tclose(it->second.td);
 		it->second.status =file_cache_row::DOWNLOAD_PAUSED;
 		it->second.td = -1;
-		printf("Download paused\n");
+		printf("\033[2KDownload paused\n");
 	}
 
 	//WORKAROUNDS
-	if(it->second.startOffset && it->second.available_bytes>= it->second.size) {
-		//printf("Workaround #1\n"); //have to call manually if the download didn't start at 0
+	if(it->second.startOffset && it->second.available_bytes>= it->second.size)
+	{ // Workaround #1 - have to call manually if the download didn't start at 0
 		transfer_complete(td, NULL, NULL);
 	} else if(endChunk > startChunk && endChunk < it->second.availableChunks.size() && it->second.availableChunks[endChunk]) {
-		printf("Encountered already available data at block %d. Stopping...\n", endChunk);
+		printf("\033[2KEncountered already available data at block %d. Stopping...\n", endChunk);
 		transfer_complete(td, NULL, NULL);
 	}
 }
 void MegaFuseApp::unlink_result(handle h, error e)
 {
-	printf("Executing unlink\n");
-	int unlink_ret  = (e)?-1:1;
-	model->eh.notifyEvent(EventsHandler::UNLINK_RESULT,unlink_ret);
+	printf("\033[2KExecuting unlink\n");
+	model->eh.notifyEvent(EventsHandler::UNLINK_RESULT, e?-1:1);
 }
 void MegaFuseApp::users_updated(User** u, int count)
 {
