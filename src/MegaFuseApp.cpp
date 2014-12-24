@@ -56,7 +56,7 @@ void MegaFuseApp::nodes_updated(Node** n, int c)
 			printf("Rename detected from %s to %s and source is in cache\n", currentCache->first.c_str(), fullpath.c_str());
 			model->rename(currentCache->first.c_str(),fullpath.c_str());
 		} else if(!removed && it!= model->cacheManager.end() && it->second.status == file_cache_row::UPLOADING) {
-			printf("file uploaded nodehandle %lx\n", n[i]->nodehandle);
+			printf("file uploaded nodehandle %llu\n", n[i]->nodehandle);
 			it->second.handle = n[i]->nodehandle;
 			it->second.status = file_cache_row::AVAILABLE;
 			it->second.last_modified = n[i]->mtime;
@@ -64,7 +64,7 @@ void MegaFuseApp::nodes_updated(Node** n, int c)
 
 		}
 		else if(!removed && it!= model->cacheManager.end()) {
-			printf("file overwritten. nodehandle %lx\n",n[i]->nodehandle);
+			printf("file overwritten. nodehandle %llu\n",n[i]->nodehandle);
 			it->second.handle = n[i]->nodehandle;
 			it->second.status = file_cache_row::INVALID;
 			model->eh.notifyEvent(EventsHandler::NODE_UPDATED, 0, fullpath);
@@ -156,11 +156,11 @@ void MegaFuseApp::transfer_complete(int td, chunkmac_map* macs, const char* fn)
 		int td;
 		if(startOffset+neededBytes > it->second.size)
 		{
-			printf("\033[2KDownload reissued, missing %lu bytes starting from block %d\n", -1, startBlock);
+			printf("\033[2KDownload reissued, missing %d bytes starting from block %d\n", -1, startBlock);
 			td = client->topen(n->nodehandle, NULL, startOffset, -1, 1);
 			printf("\033[2Ktd %d\n", td);
 		} else {
-			printf("\033[2KDownload reissued, missing %lu bytes starting from block %d\n", neededBytes, startBlock);
+			printf("\033[2KDownload reissued, missing %u bytes starting from block %d\n", neededBytes, startBlock);
 			td = client->topen(n->nodehandle, NULL, startOffset, neededBytes, 1);
 		}
 		if(td < 0)
@@ -224,7 +224,7 @@ void MegaFuseApp::transfer_complete(int td, handle ulhandle, const byte* ultoken
 		client->putnodes(putf->targetuser.c_str(),newnode,1);
 	} else*/ client->putnodes(target->nodehandle,newnode,1);
 
-	printf("\033[2Kulhandle %lx, nodehandle %lx\n", ulhandle, newnode->nodehandle);
+	printf("\033[2Kulhandle %llu, nodehandle %llu\n", ulhandle, newnode->nodehandle);
 
 	it->second.td = -1;
 	it->second.modified = false;
@@ -238,26 +238,30 @@ void MegaFuseApp::transfer_failed(int td, error e)
 	printf("\033[2KUpload failure: %d\n", e);
 	client->tclose(td);
 	auto it = model->cacheManager.findByTransfer(td, file_cache_row::UPLOADING);
-	if(it == model->cacheManager.end()) {
+	if(it != model->cacheManager.end())
+	{
 		it->second.status = file_cache_row::AVAILABLE;
 		it->second.td = -1;
 	}
-	model->eh.notifyEvent(EventsHandler::UPLOAD_COMPLETE,e);
+	model->eh.notifyEvent(EventsHandler::UPLOAD_COMPLETE, e);
 }
 void MegaFuseApp::transfer_failed(int td, string& filename, error e)
 {
-	printf("\033[2KUpload failure: %d\n", e);
-	auto it = model->cacheManager.findByTransfer(td,file_cache_row::DOWNLOADING );
+	printf("\033[2KUpload failure: %d [%s]\n", e, filename.c_str());
 	client->tclose(td);
-
-	it->second.status = file_cache_row::INVALID;
-	model->eh.notifyEvent(EventsHandler::TRANSFER_COMPLETE,-1);
+	auto it = model->cacheManager.findByTransfer(td, file_cache_row::DOWNLOADING);
+	if(it != model->cacheManager.end())
+	{
+		it->second.status = file_cache_row::INVALID;
+		it->second.td = -1;
+	}
+	model->eh.notifyEvent(EventsHandler::TRANSFER_COMPLETE, e);
 }
 void MegaFuseApp::transfer_update(int td, m_off_t bytes, m_off_t size, dstime starttime)
 {
 	std::string remotename = "";
 	if(model->cacheManager.findByTransfer(td,file_cache_row::UPLOADING ) != model->cacheManager.end()) {
-		printf("\033[2KUPLOAD TD %d: Update: %d KB of %d KB, %0.2f KB/s\r", td, bytes/1024, size/1024, bytes*10/(1024*(client->httpio->ds-starttime)+1));
+		printf("\033[2KUPLOAD TD %d: Update: %lld KB of %lld KB, %0.2f KB/s\r", td, bytes/1024, size/1024, float(1.0*bytes*10/(1024*(client->httpio->ds-starttime)+1)));
 		fflush(stdout);
 		return;
 	}
@@ -315,7 +319,7 @@ void MegaFuseApp::transfer_update(int td, m_off_t bytes, m_off_t size, dstime st
 		//static time_t last_update = time(NULL);
 		//if(last_update < time(NULL))
 		//{
-			printf("\033[2K[%s] %0.2f/%0.2f MB, %d KB/s\r", r.c_str(), float(1.0*(it->second.startOffset+bytes)/1024/1024), float(1.0*size/1024/1024), 10*bytes/(1024*(client->httpio->ds-starttime)+1));
+			printf("\033[2K[%s] %0.2f/%0.2f MB, %lld KB/s\r", r.c_str(), float(1.0*(it->second.startOffset+bytes)/1024/1024), float(1.0*size/1024/1024), 10*bytes/(1024*(client->httpio->ds-starttime)+1));
 			fflush(stdout);
 		//	last_update = time(NULL);
 		//}

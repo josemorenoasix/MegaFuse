@@ -509,6 +509,8 @@ void DemoApp::getua_result(byte* data, unsigned l)
 
 void DemoApp::notify_retry(dstime dsdelta)
 {
+	if(dsdelta > 512) // limit max delay to 51.2s
+		dsdelta = 512;
 	cout << "API request failed, retrying in " << dsdelta*100 << " ms - Use 'retry' to retry immediately..." << endl;
 }
 

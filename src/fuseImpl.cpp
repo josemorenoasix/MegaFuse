@@ -110,7 +110,7 @@ int megafuse_mainpp(int argc, char**argv, MegaFuse* mf)
 	hello_oper.chmod      = hello_chmod;
 	hello_oper.chown      = hello_chown;
 	hello_oper.truncate   = hello_truncate;
-	hello_oper.write      = hello_write;
+	//hello_oper.write      = hello_write;
 	hello_oper.mkdir      = hello_mkdir;
 	hello_oper.rename     =hello_rename;
 	hello_oper.link		= hello_link;
