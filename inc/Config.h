@@ -13,6 +13,7 @@ class Config
 		std::string PASSWORD;
 		std::string APPKEY;
 		std::string MOUNTPOINT;
+		std::string CACHEPATH;
 		int fuseindex;
 
 	private:

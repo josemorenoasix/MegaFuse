@@ -2,15 +2,16 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <string.h>
 #include <unistd.h>
 #include <termios.h>
 #include <dirent.h>
-
+#include <algorithm> 
+#include <functional> 
+#include <cctype>
+#include <locale>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <pwd.h>
-#include <string.h>
 
 static inline bool fileExists(std::string path)
 {
@@ -18,11 +19,7 @@ static inline bool fileExists(std::string path)
 	return (stat(path.c_str(), &buffer) == 0); 
 }
 
-#include <string.h>
-#include <algorithm> 
-#include <functional> 
-#include <cctype>
-#include <locale>
+
 static inline std::string &ltrim(std::string &s) {
 	s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
 	return s;
@@ -123,6 +120,16 @@ std::string Config::getString(std::string prompt, bool isPassword)
 	}
 	return buffer;	
 }
+static int countEntriesInDir(std::string dirname)
+{
+        int n=0;
+        dirent* d;
+        DIR* dir = opendir(dirname.c_str());
+        if (dir == NULL) return -1;
+        while((d = readdir(dir))!=NULL) n++;
+        closedir(dir);
+        return n;
+}
 void Config::LoadConfig()
 {
 	std::ifstream file(configFile, std::ifstream::in);
@@ -130,6 +137,7 @@ void Config::LoadConfig()
 	std::string user = "";
 	std::string pass = "";
 	std::string mount = "";
+	std::string cache = "";
 	if(configFile.empty())
 	{
 		fprintf(stderr, "Config file not found.\n");
@@ -164,6 +172,9 @@ void Config::LoadConfig()
 					mount = value;
 				else if(key == "APPKEY")
 					APPKEY = value;
+				else if(key == "CACHEPATH")
+					cache = value;
+
 			} else {
 				fprintf(stderr, "Could not parse line %d: %s\n", linenum, line.c_str());			
 			}
@@ -182,20 +193,12 @@ void Config::LoadConfig()
 			PASSWORD = getString("Enter your password: ", true);
 	if(MOUNTPOINT.empty() && !mount.empty())
 		MOUNTPOINT = mount;
-	unsigned short n;
-	do {
-		n = 0;
-		dirent* d;
-		DIR* dir = opendir(MOUNTPOINT.c_str());
-		if(dir != NULL)
-		{
-			while((d = readdir(dir))!=NULL && n < 2)
-				n++;
-			closedir(dir);
-		}
-		if(n != 2)
-			MOUNTPOINT = getString("Specify a vailid mountpoint (an empty directory): ", false);
-	} while(n != 2);
+	if(CACHEPATH.empty() && !cache.empty())
+		CACHEPATH = cache;
+	while(countEntriesInDir(MOUNTPOINT) != 2)
+		MOUNTPOINT = getString("Specify a valid mountpoint (an empty directory): ", false);
+	while(0 > countEntriesInDir(CACHEPATH))
+		CACHEPATH = getString("Specify a valid cache path (eg: /tmp): ",false);
 }
 Config::Config():APPKEY("MEGASDK"), fuseindex(-1)
 {
