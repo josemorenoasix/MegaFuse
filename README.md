@@ -17,9 +17,12 @@ After setting up Homebrew, install additional package by the following command:
 	brew install cryptopp curl berkeley-db freeimage readline
 
 then install OSXFuse from [here](http://osxfuse.github.io)
+
 OSXFuse need further configuration:
+
 Modify a value in both /usr/local/include/fuse/fuse.h & /usr/local/include/osxfuse/fuse/fuse.h:
-#define FUSE_USE_VERSION 21 > 26 (change from 21 to 26)
+
+	define FUSE_USE_VERSION 21 > 26 (change from 21 to 26)
 
 to compile:
 
@@ -31,6 +34,7 @@ If you're lazy, here is my [compiled binary](https://mega.nz/#!gEwgiYiJ!oybWCZxy
 Please edit your config file "megafuse.conf" before running, you have to change at least your username and password.
 The mountpoint must be an empty directory.
 Optionally you can add this tool to /etc/fstab but this is untested,yet.
+
 to run,just
 
 	./MegaFuse
@@ -51,7 +55,9 @@ after an abnormal termination you might need to clear the mountpoint:
 	or # umount $MOUNTPOINT
 
 This project is forked from [here](https://github.com/Saoneth/MegaFuse), which is forked from the [original author](https://github.com/matteoserva/MegaFuse)
+
 I modified for OS X usage and add cache folder configuration.
+
 The original author is currently accepting donations via paypal at the address of his main project
 
 	http://ygopro.it/web/modules.php?name=Donations&op=make
