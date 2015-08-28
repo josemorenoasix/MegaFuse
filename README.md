@@ -11,20 +11,29 @@ The files are downloaded on the fly when requested and then cached to speedup pr
 The downloader will assign a higher priority to the requested chunk, and prefetch the remaining data.
 This allows also fast streaming of video files without prior encoding.
 
+To compile on OS X, you need additional packages, I suggest using [Homebrew](http://brew.sh)
+After setting up Homebrew, install additional package by the following command:
 
-please edit your config file "megafuse.conf" before running, you have to change at least your username and password.
-The mountpoint must be an empty directory.
-By default on debian system you need to be root to mount a fuse filesystem.
-Optionally you can add this tool to /etc/fstab but this is untested,yet.
+	brew install cryptopp curl berkeley-db freeimage readline
 
-to run,just
+then install OSXFuse from [here](http://osxfuse.github.io)
+OSXFuse need further configuration:
+Modify a value in both /usr/local/include/fuse/fuse.h & /usr/local/include/osxfuse/fuse/fuse.h:
+#define FUSE_USE_VERSION 21 > 26 (change from 21 to 26)
+
+to compile:
 
 	make
-	./MegaFuse
 
-to compile on debian or ubuntu you need these additional packages:
-	
-	apt-get install libcrypto++ libcurl4-openssl-dev libdb5.1++-dev libfreeimage-dev libreadline-dev libfuse-dev
+it will create an executable file called MegaFuse.
+If you're lazy, here is my [compiled binary](https://mega.nz/#!gEwgiYiJ!oybWCZxyGG24dn2Ri3fkcy7q675HXml0xJzNJKn66D8)
+
+Please edit your config file "megafuse.conf" before running, you have to change at least your username and password.
+The mountpoint must be an empty directory.
+Optionally you can add this tool to /etc/fstab but this is untested,yet.
+to run,just
+
+	./MegaFuse
 
 you can pass additional options to the fuse module via the command line option -f. example:
 	
@@ -41,7 +50,9 @@ after an abnormal termination you might need to clear the mountpoint:
 	$ fusermount -u $MOUNTPOINT
 	or # umount $MOUNTPOINT
 
-I'm currently accepting donations via paypal at the address of my main project
+This project is forked from [here](https://github.com/Saoneth/MegaFuse), which is forked from the [original author](https://github.com/matteoserva/MegaFuse)
+I modified for OS X usage and add cache folder configuration.
+The original author is currently accepting donations via paypal at the address of his main project
 
 	http://ygopro.it/web/modules.php?name=Donations&op=make
 
