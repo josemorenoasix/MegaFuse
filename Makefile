@@ -8,12 +8,12 @@ OUT = $(TARGET)
 OBJ = $(patsubst %.cpp, %.o, $(patsubst %.c, %.o, $(SRC)))
 
 # include directories
-INCLUDES = -I inc -I /usr/include/cryptopp -I sdk
+INCLUDES = -I inc -I /usr/local/include/cryptopp -I sdk -I /usr/local/include
 
 # C compiler flags
 CCFLAGS = -g -O2 -Wall -fstack-protector-all #-non-call-exceptions
 CCFLAGS += $(shell pkg-config --cflags libcurl fuse)
-CPPFLAGS = -std=c++0x $(CCFLAGS) -D_GLIBCXX_DEBUG 
+CPPFLAGS =  -std=c++0x $(CCFLAGS) -D_GLIBCXX_DEBUG -D_DARWIN_C_SOURCE
 
 # compiler
 CC = gcc
