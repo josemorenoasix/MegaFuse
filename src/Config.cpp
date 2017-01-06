@@ -58,7 +58,7 @@ bool Config::parseCommandLine(int argc, char**argv)
 				return false;
 			case 'c':
             			configFile=optarg;
-           			cout <<"ss "<<configFile<<endl;
+           			/*cout <<"ss "<<configFile<<endl;*/
 				break;
 			case 'u':
 				USERNAME = optarg;
