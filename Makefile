@@ -8,7 +8,7 @@ OUT = $(TARGET)
 OBJ = $(patsubst %.cpp, %.o, $(patsubst %.c, %.o, $(SRC)))
 
 # include directories
-INCLUDES = -I inc -I /usr/local/include/cryptopp -I sdk -I /usr/local/include
+INCLUDES = -I inc -I /usr/include/cryptopp -I sdk -I /usr/include
 
 # C compiler flags
 CCFLAGS = -g -O2 -Wall -fstack-protector-all #-non-call-exceptions
