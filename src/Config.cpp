@@ -57,6 +57,8 @@ bool Config::parseCommandLine(int argc, char**argv)
 				fuseindex = optind;
 				return false;
 			case 'c':
+            			configFile=optarg;
+           			cout <<"ss "<<configFile<<endl;
 				break;
 			case 'u':
 				USERNAME = optarg;
